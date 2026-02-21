@@ -20,16 +20,23 @@ jobs:
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
         run: |
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
-          gpg --list-keys
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --batch --list-secret-keys --keyid-format LONG
 
-      - name: Write Maven settings.xml from secret
+      - name: Configure GPG for CI
         run: |
-          mkdir -p ~/.m2
-          echo "${{ secrets.MAVEN_SETTINGS_XML }}" > ~/.m2/settings.xml
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          gpgconf --kill gpg-agent
 
       - name: Build and deploy to Sonatype OSSRH
         env:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          mvn clean deploy -Prelease -Dgpg.executable=gpg -Dgpg.passphrase="$GPG_PASSPHRASE"
+          mvn clean deploy \
+            -Prelease \
+            -Dgpg.executable=gpg \
+            -Dgpg.passphrase="$GPG_PASSPHRASE" \
+            -Dgpg.pinentry.mode=loopback
