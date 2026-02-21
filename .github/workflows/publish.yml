@@ -23,7 +23,6 @@ jobs:
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
           printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
-          gpg --batch --list-secret-keys --keyid-format LONG
 
       - name: Configure GPG for CI
         run: |
