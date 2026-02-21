@@ -8,6 +8,33 @@
     <artifactId>java-dto-generator</artifactId>
     <version>1.0.0</version>
 
+    <name>com.tabariyya.dtogenerator</name>
+    <description>DTO generator</description>
+    <url>https://github.com/Tabariyya/java-dto-generator.git</url>
+
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>Waleed</id>
+            <name>Waleed Shanaa</name>
+            <email>waleed.shanaa@tabariyya.com</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://github.com/Tabariyya/java-dto-generator</url>
+        <connection>scm:git:git://github.com/tabariyya/java-dto-generator.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com:tabariyya/java-dto-generator.git</developerConnection>
+    </scm>
+
+
     <dependencies>
         <dependency>
             <groupId>com.google.auto.service</groupId>
