@@ -217,15 +217,16 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                                 renderAnnotation(annotation) + "\n");
                     }
 
-                    writer.write("    private final "
+                    writer.write("    private "
                             + simpleName(field.typeFqn)
                             + " "
                             + field.name
-                            + ";\n\n");
+                            + ";\n");
                 }
 
-                writer.write("    public " + className + "(\n");
+                writer.write("\n    public " + className + "() {}\n\n");
 
+                writer.write("    public " + className + "(\n");
                 String params =
                         fields.stream()
                                 .map(f -> "            "
@@ -233,36 +234,26 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                                         + " "
                                         + f.name)
                                 .collect(Collectors.joining(",\n"));
-
                 writer.write(params + "\n    ) {\n");
-
                 for (DtoField field : fields) {
-                    writer.write("        this."
-                            + field.name
-                            + " = "
-                            + field.name
-                            + ";\n");
+                    writer.write("        this." + field.name
+                            + " = " + field.name + ";\n");
                 }
-
                 writer.write("    }\n\n");
 
                 for (DtoField field : fields) {
                     String type = simpleName(field.typeFqn);
                     String name = field.name;
 
-                    String methodName =
-                            "get"
-                                    + Character.toUpperCase(name.charAt(0))
+                    String capitalised =
+                            Character.toUpperCase(name.charAt(0))
                                     + name.substring(1);
 
-                    writer.write("    public "
-                            + type
-                            + " "
-                            + methodName
-                            + "() {\n");
-
-                    writer.write("        return " + name + ";\n");
-                    writer.write("    }\n\n");
+                    writer.write("    public " + type + " get" + capitalised
+                            + "() { return " + name + "; }\n");
+                    writer.write("    public void set" + capitalised
+                            + "(" + type + " " + name + ") { this."
+                            + name + " = " + name + "; }\n\n");
                 }
 
                 writer.write("}\n");
