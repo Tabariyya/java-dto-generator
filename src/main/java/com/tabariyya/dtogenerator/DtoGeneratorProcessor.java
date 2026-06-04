@@ -1,6 +1,7 @@
 package com.tabariyya.dtogenerator;
 
 import com.google.auto.service.AutoService;
+import com.tabariyya.dtogenerator.annotations.AddAnnotation;
 import com.tabariyya.dtogenerator.annotations.Field;
 import com.tabariyya.dtogenerator.annotations.GenerateDto;
 
@@ -115,10 +116,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
             for (AnnotationMirror annotation :
                     existingField.getAnnotationMirrors()) {
 
-                String annotationPackage =
-                        packageName(annotation.getAnnotationType().toString());
-
-                if (shouldKeepAnnotation(annotationPackage)) {
+                if (shouldKeepAnnotation(annotation)) {
                     annotations.add(annotation);
                 }
             }
@@ -143,10 +141,17 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                 continue;
             }
 
+            List<String> rawAnnotations = new ArrayList<String>();
+            for (AddAnnotation addAnnotation : dtoField.annotations()) {
+                String fqn = getAddAnnotationTypeName(addAnnotation);
+                rawAnnotations.add(buildRawAnnotation(fqn, addAnnotation.params()));
+            }
+
             fields.add(new DtoField(
                     dtoField.name(),
                     getTypeName(dtoField),
-                    Collections.<AnnotationMirror>emptyList()));
+                    Collections.<AnnotationMirror>emptyList(),
+                    rawAnnotations));
         }
 
         writeRecord(method, newClassName, fields);
@@ -158,6 +163,21 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
         } catch (MirroredTypeException mte) {
             return mte.getTypeMirror().toString();
         }
+    }
+
+    private String getAddAnnotationTypeName(AddAnnotation annotation) {
+        try {
+            return annotation.value().getCanonicalName();
+        } catch (MirroredTypeException mte) {
+            return mte.getTypeMirror().toString();
+        }
+    }
+
+    private String buildRawAnnotation(String fqn, String params) {
+        if (params.isEmpty()) {
+            return "@" + fqn;
+        }
+        return "@" + fqn + "(" + params + ")";
     }
 
     private void writeRecord(Element originatingElement,
@@ -198,6 +218,13 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                             imports.add(annotationFQN);
                         }
                     }
+
+                    for (String raw : field.rawAnnotations) {
+                        String fqn = extractRawAnnotationFqn(raw);
+                        if (needsImport(packageName(fqn), packageName)) {
+                            imports.add(fqn);
+                        }
+                    }
                 }
 
                 for (String imp : imports) {
@@ -215,6 +242,11 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                     for (AnnotationMirror annotation : field.annotations) {
                         writer.write("    " +
                                 renderAnnotation(annotation) + "\n");
+                    }
+
+                    for (String raw : field.rawAnnotations) {
+                        writer.write("    " +
+                                renderRawAnnotation(raw) + "\n");
                     }
 
                     writer.write("    private "
@@ -295,8 +327,42 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
         return sb.toString();
     }
 
-    private boolean shouldKeepAnnotation(String annotationPackageName) {
-        return annotationPackageName.contains("constraints");
+    // Extracts the FQN from a raw annotation string like "@com.example.Foo(value = 1)"
+    private String extractRawAnnotationFqn(String raw) {
+        int start = raw.startsWith("@") ? 1 : 0;
+        int end = raw.indexOf('(');
+        if (end == -1) end = raw.length();
+        return raw.substring(start, end).trim();
+    }
+
+    // Replaces FQN with simple name: "@com.example.Foo(x)" → "@Foo(x)"
+    private String renderRawAnnotation(String raw) {
+        String fqn = extractRawAnnotationFqn(raw);
+        String simple = simpleName(fqn);
+        return raw.replace(fqn, simple);
+    }
+
+    private boolean shouldKeepAnnotation(AnnotationMirror annotation) {
+        String annotationPackageName =
+                packageName(annotation.getAnnotationType().toString());
+
+        if (annotationPackageName.contains("constraints")) {
+            return true;
+        }
+
+        // Also keep custom annotations that are meta-annotated with @Constraint
+        // (the standard marker for custom Jakarta Bean Validation annotations)
+        TypeElement annotationType =
+                (TypeElement) annotation.getAnnotationType().asElement();
+        for (AnnotationMirror meta : annotationType.getAnnotationMirrors()) {
+            String metaFqn = meta.getAnnotationType().toString();
+            if (metaFqn.equals("jakarta.validation.Constraint")
+                    || metaFqn.equals("javax.validation.Constraint")) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private String simpleName(String fqn) {
@@ -319,13 +385,22 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
         final String name;
         final String typeFqn;
         final List<AnnotationMirror> annotations;
+        final List<String> rawAnnotations;
 
         DtoField(String name,
                  String typeFqn,
                  List<AnnotationMirror> annotations) {
+            this(name, typeFqn, annotations, Collections.<String>emptyList());
+        }
+
+        DtoField(String name,
+                 String typeFqn,
+                 List<AnnotationMirror> annotations,
+                 List<String> rawAnnotations) {
             this.name = name;
             this.typeFqn = typeFqn;
             this.annotations = annotations;
+            this.rawAnnotations = rawAnnotations;
         }
     }
 
