@@ -15,6 +15,7 @@ import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
 import java.io.Writer;
 import java.util.*;
+import java.util.regex.*;
 import java.util.stream.Collectors;
 
 import static javax.tools.Diagnostic.Kind.ERROR;
@@ -105,10 +106,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                 continue;
             }
 
-            String existingFieldFqn =
-                    processingEnv.getTypeUtils()
-                            .erasure(existingField.asType())
-                            .toString();
+            String existingFieldFqn = cleanTypeSignature(existingField.asType().toString());
 
             List<AnnotationMirror> annotations =
                     new ArrayList<AnnotationMirror>();
@@ -205,8 +203,10 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
 
                 for (DtoField field : fields) {
 
-                    if (needsImport(packageName(field.typeFqn), packageName)) {
-                        imports.add(field.typeFqn);
+                    for (String fqn : extractFqns(field.typeFqn)) {
+                        if (needsImport(packageName(fqn), packageName)) {
+                            imports.add(fqn);
+                        }
                     }
 
                     for (AnnotationMirror annotation : field.annotations) {
@@ -250,7 +250,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                     }
 
                     writer.write("    private "
-                            + simpleName(field.typeFqn)
+                            + simplifyType(field.typeFqn)
                             + " "
                             + field.name
                             + ";\n");
@@ -262,7 +262,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                 String params =
                         fields.stream()
                                 .map(f -> "            "
-                                        + simpleName(f.typeFqn)
+                                        + simplifyType(f.typeFqn)
                                         + " "
                                         + f.name)
                                 .collect(Collectors.joining(",\n"));
@@ -274,7 +274,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                 writer.write("    }\n\n");
 
                 for (DtoField field : fields) {
-                    String type = simpleName(field.typeFqn);
+                    String type = simplifyType(field.typeFqn);
                     String name = field.name;
 
                     String capitalised =
@@ -363,6 +363,39 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
         }
 
         return false;
+    }
+
+    private static final Pattern FQN_PATTERN =
+            Pattern.compile("[a-zA-Z_$][a-zA-Z0-9_$]*(?:\\.[a-zA-Z_$][a-zA-Z0-9_$]*)+");
+
+    private String cleanTypeSignature(String raw) {
+        if (raw == null) return "";
+        String cleaned = raw.replaceAll("@[a-zA-Z_$][a-zA-Z0-9_$.]*(?:\\((?:[^)(]+|\\([^)(]*\\))*\\))?", "");
+        cleaned = cleaned.replaceAll("\\s*\\.\\s*", ".");
+        cleaned = cleaned.replaceAll("\\s+", " ").trim();
+        return cleaned;
+    }
+
+    private List<String> extractFqns(String typeSignature) {
+        String cleaned = cleanTypeSignature(typeSignature);
+        List<String> fqns = new ArrayList<String>();
+        Matcher matcher = FQN_PATTERN.matcher(cleaned);
+        while (matcher.find()) {
+            fqns.add(matcher.group());
+        }
+        return fqns;
+    }
+
+    private String simplifyType(String typeSignature) {
+        String cleaned = cleanTypeSignature(typeSignature);
+        Matcher matcher = FQN_PATTERN.matcher(cleaned);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String fqn = matcher.group();
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(simpleName(fqn)));
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
     }
 
     private String simpleName(String fqn) {

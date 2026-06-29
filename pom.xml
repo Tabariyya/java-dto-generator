@@ -6,7 +6,7 @@
 
     <groupId>com.tabariyya</groupId>
     <artifactId>java-dto-generator</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
 
     <name>com.tabariyya.dtogenerator</name>
     <description>DTO generator</description>
