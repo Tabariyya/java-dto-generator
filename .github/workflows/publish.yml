@@ -53,10 +53,15 @@ jobs:
             -e GPG_PRIVATE_KEY \
             -e GPG_PASSPHRASE \
             -e MAVEN_SETTINGS_XML \
+            -e HOST_UID="$(id -u)" \
+            -e HOST_GID="$(id -g)" \
             maven:3.9-eclipse-temurin-8 \
             bash -c '
               apt-get update -q && apt-get install -y -q gnupg &&
               echo "$GPG_PRIVATE_KEY" | gpg --batch --import &&
               mkdir -p ~/.m2 && printf "%s" "$MAVEN_SETTINGS_XML" > ~/.m2/settings.xml &&
               mvn clean deploy -Prelease -Dgpg.passphrase="$GPG_PASSPHRASE"
+              STATUS=$?
+              chown -R "$HOST_UID:$HOST_GID" /app
+              exit $STATUS
             '

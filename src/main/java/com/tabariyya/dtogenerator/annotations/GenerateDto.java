@@ -10,4 +10,7 @@ import java.lang.annotation.Target;
 public @interface GenerateDto {
     String[] removeFields() default {};
     Field[] addFields() default {};
+
+    /** Class the generated DTO extends. Object (the default) means no extends clause. */
+    Class<?> extend() default Object.class;
 }

@@ -9,7 +9,10 @@ import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.lang.model.element.*;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.MirroredTypeException;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
@@ -77,11 +80,11 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
             return;
         }
 
+        List<VariableElement> sourceFields = collectInstanceFields(sourceType);
+
         Set<String> actualFieldNames =
-                ElementFilter.fieldsIn(sourceType.getEnclosedElements())
+                sourceFields
                         .stream()
-                        .filter(field ->
-                                !field.getModifiers().contains(Modifier.STATIC))
                         .map(field -> field.getSimpleName().toString())
                         .collect(Collectors.toSet());
 
@@ -96,13 +99,11 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
 
         List<DtoField> fields = new ArrayList<DtoField>();
 
-        for (VariableElement existingField :
-                ElementFilter.fieldsIn(sourceType.getEnclosedElements())) {
+        for (VariableElement existingField : sourceFields) {
 
             String fieldName = existingField.getSimpleName().toString();
 
-            if (existingField.getModifiers().contains(Modifier.STATIC)
-                    || fieldsToRemove.contains(fieldName)) {
+            if (fieldsToRemove.contains(fieldName)) {
                 continue;
             }
 
@@ -152,7 +153,51 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                     rawAnnotations));
         }
 
-        writeRecord(method, newClassName, fields);
+        writeRecord(method, newClassName, getExtendsTypeName(generateDto), fields);
+    }
+
+    /**
+     * Collects the non-static fields of the source class and every superclass up to (excluding) java.lang.Object,
+     * ordered superclass-first. A subclass field shadowing a superclass field wins, keeping the superclass position.
+     */
+    private List<VariableElement> collectInstanceFields(TypeElement sourceType) {
+        Deque<TypeElement> hierarchy = new ArrayDeque<TypeElement>();
+
+        for (TypeElement current = sourceType; current != null; ) {
+            hierarchy.addFirst(current);
+
+            TypeMirror superclass = current.getSuperclass();
+            if (superclass.getKind() != TypeKind.DECLARED) {
+                break;
+            }
+
+            TypeElement superElement =
+                    (TypeElement) ((DeclaredType) superclass).asElement();
+            if (superElement.getQualifiedName().contentEquals("java.lang.Object")) {
+                break;
+            }
+
+            current = superElement;
+        }
+
+        Map<String, VariableElement> fields = new LinkedHashMap<String, VariableElement>();
+        for (TypeElement type : hierarchy) {
+            for (VariableElement field : ElementFilter.fieldsIn(type.getEnclosedElements())) {
+                if (!field.getModifiers().contains(Modifier.STATIC)) {
+                    fields.put(field.getSimpleName().toString(), field);
+                }
+            }
+        }
+
+        return new ArrayList<VariableElement>(fields.values());
+    }
+
+    private String getExtendsTypeName(GenerateDto generateDto) {
+        try {
+            return generateDto.extend().getCanonicalName();
+        } catch (MirroredTypeException mte) {
+            return mte.getTypeMirror().toString();
+        }
     }
 
     private String getTypeName(Field field) {
@@ -180,6 +225,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
 
     private void writeRecord(Element originatingElement,
                              String className,
+                             String extendsFqn,
                              List<DtoField> fields) {
 
         try {
@@ -199,7 +245,13 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
             try {
                 writer.write("package " + packageName + ";\n\n");
 
+                boolean hasSuperclass = !extendsFqn.equals("java.lang.Object");
+
                 Set<String> imports = new TreeSet<String>();
+
+                if (hasSuperclass && needsImport(packageName(extendsFqn), packageName)) {
+                    imports.add(extendsFqn);
+                }
 
                 for (DtoField field : fields) {
 
@@ -235,7 +287,9 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                     writer.write("\n");
                 }
 
-                writer.write("public class " + className + " {\n\n");
+                writer.write("public class " + className
+                        + (hasSuperclass ? " extends " + simpleName(extendsFqn) : "")
+                        + " {\n\n");
 
                 for (DtoField field : fields) {
 
