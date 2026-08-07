@@ -25,8 +25,12 @@
     </dependencies>
 
     <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
+        <!--
+          Stays on Java 8 so existing consumers keep working. `release` rather than source/target:
+          the build JDK is no longer 8, and only `release` checks that the sources use nothing newer
+          than the Java 8 API.
+        -->
+        <maven.compiler.release>8</maven.compiler.release>
     </properties>
 
     <build>
