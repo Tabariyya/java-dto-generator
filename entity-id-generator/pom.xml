@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.tabariyya</groupId>
+        <artifactId>java-generators-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>java-entity-id-generator</artifactId>
+    <version>1.0.0</version>
+
+    <name>com.tabariyya.entityidgen</name>
+    <description>Generates a strongly typed identifier record for every JPA @Entity</description>
+
+    <properties>
+        <!--
+          Cannot follow the DTO generator down to Java 8: the processor uses pattern matching for
+          instanceof and Set.of, it emits records, and Hibernate 7 needs 17+.
+        -->
+        <maven.compiler.release>21</maven.compiler.release>
+        <hibernate.version>7.2.12.Final</hibernate.version>
+        <junit.version>5.11.4</junit.version>
+    </properties>
+
+    <dependencies>
+        <!--
+          Only the id generator and the user types it emits need Hibernate; consumers already bring
+          it at runtime, so it stays off their compile classpath.
+        -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <version>${hibernate.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+          The tests compile generated sources in-memory against the test-runtime classpath, so the
+          Hibernate (UserType, @TypeRegistration) and Jackson types they reference must be present.
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.21</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <!-- Don't run this project's own processor while compiling itself. -->
+                    <proc>none</proc>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!--
+                      The tests hand sources to the in-JVM javac, which resolves its classpath from
+                      java.class.path. Surefire's default manifest-only jar leaves that property
+                      holding a single stub jar, so the generated Hibernate/Jackson references would
+                      not resolve; a real classpath is what makes the compilation under test work.
+                    -->
+                    <useSystemClassLoader>true</useSystemClassLoader>
+                    <useManifestOnlyJar>false</useManifestOnlyJar>
+                    <useModulePath>false</useModulePath>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
