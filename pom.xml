@@ -5,12 +5,26 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.tabariyya</groupId>
-    <artifactId>java-dto-generator</artifactId>
-    <version>1.0.4</version>
+    <artifactId>java-generators-parent</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
 
-    <name>com.tabariyya.dtogenerator</name>
-    <description>DTO generator</description>
-    <url>https://github.com/Tabariyya/java-dto-generator.git</url>
+    <name>com.tabariyya.generators</name>
+    <description>Aggregator for the Tabariyya annotation processors</description>
+    <!--
+      Maven otherwise appends each module's directory to an inherited url/scm, which would publish
+      java-dto-generator with a URL it has never had. Pin the inherited values verbatim.
+    -->
+    <url child.project.url.inherit.append.path="false">https://github.com/Tabariyya/java-dto-generator.git</url>
+
+    <!--
+      The modules are versioned independently: they are unrelated processors with separate
+      consumers, and a shared version would force a release of one every time the other changes.
+      Each module therefore declares its own <version> rather than inheriting the parent's.
+    -->
+    <modules>
+        <module>java-dto-generator</module>
+    </modules>
 
     <licenses>
         <license>
@@ -28,45 +42,33 @@
         </developer>
     </developers>
 
-    <scm>
+    <scm child.scm.url.inherit.append.path="false"
+         child.scm.connection.inherit.append.path="false"
+         child.scm.developerConnection.inherit.append.path="false">
         <url>https://github.com/Tabariyya/java-dto-generator</url>
         <connection>scm:git:git://github.com/tabariyya/java-dto-generator.git</connection>
         <developerConnection>scm:git:ssh://git@github.com:tabariyya/java-dto-generator.git</developerConnection>
     </scm>
 
-
-    <dependencies>
-        <dependency>
-            <groupId>com.google.auto.service</groupId>
-            <artifactId>auto-service-annotations</artifactId>
-            <version>1.1.1</version>
-        </dependency>
-    </dependencies>
-
     <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.0</version>
-                <configuration>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>com.google.auto.service</groupId>
-                            <artifactId>auto-service</artifactId>
-                            <version>1.1.1</version>
-                        </path>
-                    </annotationProcessorPaths>
-                </configuration>
-            </plugin>
-
-        </plugins>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.14.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.1.2</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
     </build>
 
     <profiles>
@@ -135,7 +137,6 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
-                        <version>3.1.2</version>
                         <configuration>
                             <useModulePath>false</useModulePath>
                         </configuration>
