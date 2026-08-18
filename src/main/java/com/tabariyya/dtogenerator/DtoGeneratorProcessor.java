@@ -107,7 +107,8 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                 continue;
             }
 
-            String existingFieldFqn = cleanTypeSignature(existingField.asType().toString());
+            String existingFieldFqn =
+                    cleanTypeSignature(fieldTypeAsMemberOf(sourceType, existingField).toString());
 
             List<AnnotationMirror> annotations =
                     new ArrayList<AnnotationMirror>();
@@ -154,6 +155,23 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
         }
 
         writeRecord(method, newClassName, getExtendsTypeName(generateDto), fields);
+    }
+
+    /**
+     * Resolves a field's type as seen through the source class, substituting the type arguments the source
+     * class supplies to its superclasses. A field declared as {@code Box<T>} on {@code Base<T>} therefore
+     * reports {@code Box<String>} for {@code Sub extends Base<String>}, rather than leaking the type
+     * variable {@code T} into a generated class that does not declare it. Fields declared on the source
+     * class itself resolve to the type they are declared with.
+     */
+    private TypeMirror fieldTypeAsMemberOf(TypeElement sourceType, VariableElement field) {
+        try {
+            return processingEnv
+                    .getTypeUtils()
+                    .asMemberOf((DeclaredType) sourceType.asType(), field);
+        } catch (IllegalArgumentException e) {
+            return field.asType();
+        }
     }
 
     /**
