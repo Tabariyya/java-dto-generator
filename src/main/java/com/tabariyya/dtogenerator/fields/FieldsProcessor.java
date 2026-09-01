@@ -37,6 +37,7 @@ public class FieldsProcessor extends AbstractProcessor {
     private FieldsInjector injector;
     private String injectorFailure;
     private boolean reportedInjectorFailure;
+    private boolean reportedValidatorFailure;
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
@@ -74,9 +75,13 @@ public class FieldsProcessor extends AbstractProcessor {
                     if (event.getKind() != TaskEvent.Kind.ANALYZE || event.getTypeElement() == null) {
                         return;
                     }
-                    TreePath type = trees.getPath(event.getTypeElement());
-                    if (type != null) {
-                        new FieldPathValidator(javac, trees).scan(type, null);
+                    try {
+                        TreePath type = trees.getPath(event.getTypeElement());
+                        if (type != null) {
+                            new FieldPathValidator(javac, trees).scan(type, null);
+                        }
+                    } catch (Throwable failure) {
+                        reportValidatorFailure(failure);
                     }
                 }
             });
@@ -119,6 +124,22 @@ public class FieldsProcessor extends AbstractProcessor {
         if (!reportedInjectorFailure) {
             reportedInjectorFailure = true;
             warn(FieldConstants.injectionUnavailableMessage(injectorFailure), element);
+        }
+    }
+
+    /**
+     * This listener runs for every class in every compilation that has this library on the
+     * classpath, including the overwhelming majority that never mention {@link FieldPath}. A defect
+     * in the validator must therefore cost a warning rather than someone else's build.
+     */
+    private void reportValidatorFailure(Throwable failure) {
+        if (!reportedValidatorFailure) {
+            reportedValidatorFailure = true;
+            processingEnv
+                    .getMessager()
+                    .printMessage(
+                            Diagnostic.Kind.WARNING,
+                            "@FieldPath values went unchecked: " + describe(failure));
         }
     }
 
