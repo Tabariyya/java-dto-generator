@@ -1,0 +1,26 @@
+<idea-plugin>
+    <id>com.tabariyya.dtogenerator.fields</id>
+    <name>DTO Generator Fields</name>
+    <vendor email="waleed.shanaa@tabariyya.com" url="https://github.com/Tabariyya/java-dto-generator">Tabariyya</vendor>
+
+    <description><![CDATA[
+        Editor support for <code>@Fields</code> and <code>@FieldPath</code> from
+        <code>com.tabariyya:java-dto-generator</code>.
+        <ul>
+            <li>Resolves the <code>public static final String</code> constants the annotation
+                processor injects into <code>@Fields</code> classes, so the IDE sees them the way
+                javac does.</li>
+            <li>Reports a wrong or non-existent field path in an annotation argument as you type,
+                with the same message the compiler would print.</li>
+        </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.java</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <lang.psiAugmentProvider implementation="com.tabariyya.dtogenerator.idea.FieldsAugmentProvider"/>
+        <referencesSearch implementation="com.tabariyya.dtogenerator.idea.FieldConstantReferencesSearcher"/>
+        <annotator language="JAVA" implementationClass="com.tabariyya.dtogenerator.idea.FieldsAnnotator"/>
+        <annotator language="JAVA" implementationClass="com.tabariyya.dtogenerator.idea.FieldPathAnnotator"/>
+    </extensions>
+</idea-plugin>
