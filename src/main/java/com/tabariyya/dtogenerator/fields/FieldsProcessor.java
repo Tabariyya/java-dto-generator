@@ -1,0 +1,156 @@
+package com.tabariyya.dtogenerator.fields;
+
+import com.google.auto.service.AutoService;
+import com.sun.source.util.JavacTask;
+import com.sun.source.util.TaskEvent;
+import com.sun.source.util.TaskListener;
+import com.sun.source.util.TreePath;
+import com.sun.source.util.Trees;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Proxy;
+import java.util.Set;
+import javax.annotation.processing.AbstractProcessor;
+import javax.annotation.processing.ProcessingEnvironment;
+import javax.annotation.processing.Processor;
+import javax.annotation.processing.RoundEnvironment;
+import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.lang.model.SourceVersion;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.TypeElement;
+import javax.tools.Diagnostic;
+
+/**
+ * Runs both halves of the field-path system: {@link FieldPath} validation, which works everywhere,
+ * and {@link Fields} constant injection, which needs javac internals.
+ *
+ * <p>The two are deliberately kept apart. Validation is written against supported compiler API and is
+ * wired up here directly. Injection is reached only through {@link FieldsInjector}, loaded by name
+ * inside a {@code try}, so a compiler that refuses access to its own syntax tree costs a warning
+ * rather than the build — this class never mentions a {@code com.sun.tools.javac} type, so nothing
+ * fails to resolve when it is loaded.
+ */
+@AutoService(Processor.class)
+@SupportedAnnotationTypes("*")
+public class FieldsProcessor extends AbstractProcessor {
+
+    private static final String INJECTOR = "com.tabariyya.dtogenerator.fields.JavacFieldsInjector";
+
+    private FieldsInjector injector;
+    private String injectorFailure;
+    private boolean reportedInjectorFailure;
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SourceVersion.latestSupported();
+    }
+
+    @Override
+    public synchronized void init(ProcessingEnvironment processingEnv) {
+        super.init(processingEnv);
+        ProcessingEnvironment javac = unwrap(processingEnv);
+        validateFieldPaths(javac);
+        loadInjector(javac);
+    }
+
+    private void validateFieldPaths(final ProcessingEnvironment javac) {
+        final Trees trees;
+        try {
+            trees = Trees.instance(javac);
+            JavacTask.instance(javac).addTaskListener(new TaskListener() {
+                @Override
+                public void started(TaskEvent event) {}
+
+                @Override
+                public void finished(TaskEvent event) {
+                    if (event.getKind() != TaskEvent.Kind.ANALYZE || event.getTypeElement() == null) {
+                        return;
+                    }
+                    TreePath type = trees.getPath(event.getTypeElement());
+                    if (type != null) {
+                        new FieldPathValidator(javac, trees).scan(type, null);
+                    }
+                }
+            });
+        } catch (Throwable failure) {
+            // Not javac, or a compiler that hides its task queue: paths simply go unchecked.
+        }
+    }
+
+    private void loadInjector(ProcessingEnvironment javac) {
+        try {
+            FieldsInjector loaded =
+                    (FieldsInjector) Class.forName(INJECTOR).getDeclaredConstructor().newInstance();
+            loaded.init(javac);
+            injector = loaded;
+        } catch (Throwable failure) {
+            injector = null;
+            injectorFailure = describe(failure);
+        }
+    }
+
+    @Override
+    public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        for (Element element : roundEnv.getElementsAnnotatedWith(Fields.class)) {
+            if (!(element instanceof TypeElement)) {
+                continue;
+            }
+            if (element.getKind() == ElementKind.INTERFACE || element.getKind() == ElementKind.ANNOTATION_TYPE) {
+                warn(FieldConstants.notSupportedOnInterfacesMessage(), element);
+            } else if (element.getKind() == ElementKind.ENUM) {
+                warn(FieldConstants.notSupportedOnEnumsMessage(), element);
+            } else if (injector == null) {
+                reportInjectorFailure(element);
+            } else {
+                injector.inject((TypeElement) element);
+            }
+        }
+        return false;
+    }
+
+    private void reportInjectorFailure(Element element) {
+        if (!reportedInjectorFailure) {
+            reportedInjectorFailure = true;
+            warn(FieldConstants.injectionUnavailableMessage(injectorFailure), element);
+        }
+    }
+
+    private void warn(String message, Element element) {
+        processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING, message, element);
+    }
+
+    private static String describe(Throwable failure) {
+        String message = failure.getMessage();
+        return failure.getClass().getSimpleName() + (message == null ? "" : ": " + message);
+    }
+
+    /**
+     * Gradle hands processors a proxy around the real environment; javac's own services can only be
+     * reached through the environment underneath it.
+     */
+    private static ProcessingEnvironment unwrap(ProcessingEnvironment processingEnv) {
+        ProcessingEnvironment current = processingEnv;
+        while (current instanceof Proxy) {
+            ProcessingEnvironment delegate = delegateOf(Proxy.getInvocationHandler(current));
+            if (delegate == null) {
+                return processingEnv;
+            }
+            current = delegate;
+        }
+        return current;
+    }
+
+    private static ProcessingEnvironment delegateOf(InvocationHandler handler) {
+        for (java.lang.reflect.Field field : handler.getClass().getDeclaredFields()) {
+            if (ProcessingEnvironment.class.isAssignableFrom(field.getType())) {
+                try {
+                    field.setAccessible(true);
+                    return (ProcessingEnvironment) field.get(handler);
+                } catch (Throwable inaccessible) {
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+}

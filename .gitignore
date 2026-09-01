@@ -9,10 +9,21 @@ target/
 .idea/jarRepositories.xml
 .idea/compiler.xml
 .idea/libraries/
-idea
+# Anchored: unanchored, this matched every directory named "idea", which silently
+# excluded the plugin's own com.tabariyya.dtogenerator.idea package.
+/idea
 *.iws
 *.iml
 *.ipr
+
+### Gradle (idea-plugin) ###
+.gradle/
+gradle-app.setting
+!gradle/wrapper/gradle-wrapper.jar
+
+### IntelliJ Platform Gradle Plugin ###
+# The IDE distribution the plugin compiles against, downloaded on demand (~1.4 GB).
+.intellijPlatform/
 
 ### Eclipse ###
 .apt_generated

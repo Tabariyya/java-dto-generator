@@ -1,9 +1,19 @@
 package com.tabariyya.dtogenerator;
 
 import com.google.auto.service.AutoService;
+import com.sun.source.tree.AnnotationTree;
+import com.sun.source.tree.AssignmentTree;
+import com.sun.source.tree.ExpressionTree;
+import com.sun.source.tree.IdentifierTree;
+import com.sun.source.tree.LiteralTree;
+import com.sun.source.tree.MemberSelectTree;
+import com.sun.source.tree.NewArrayTree;
+import com.sun.source.tree.Tree;
+import com.sun.source.util.Trees;
 import com.tabariyya.dtogenerator.annotations.AddAnnotation;
 import com.tabariyya.dtogenerator.annotations.Field;
 import com.tabariyya.dtogenerator.annotations.GenerateDto;
+import com.tabariyya.dtogenerator.fields.FieldConstants;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Processor;
@@ -69,9 +79,6 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
 
         String sourceClassFqn = method.getReturnType().toString();
 
-        Set<String> fieldsToRemove =
-                new HashSet<String>(Arrays.asList(generateDto.removeFields()));
-
         TypeElement sourceType =
                 processingEnv.getElementUtils().getTypeElement(sourceClassFqn);
 
@@ -87,6 +94,8 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                         .stream()
                         .map(field -> field.getSimpleName().toString())
                         .collect(Collectors.toSet());
+
+        Set<String> fieldsToRemove = fieldsToRemove(method, actualFieldNames);
 
         for (String fieldToRemove : fieldsToRemove) {
             if (!actualFieldNames.contains(fieldToRemove)) {
@@ -154,6 +163,102 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
         }
 
         writeRecord(method, newClassName, getExtendsTypeName(generateDto), fields);
+    }
+
+    /**
+     * The field names named by {@code removeFields}, read from the annotation's syntax tree rather
+     * than from its value.
+     *
+     * <p>Reading {@code generateDto.removeFields()} would be simpler but cannot work here. javac
+     * attributes annotation arguments before any processor runs, so a constant that {@code @Fields}
+     * injects during this same compilation does not exist yet at that point; the argument is
+     * recorded as an error and the annotation proxy throws {@code AnnotationTypeMismatchException}.
+     * The syntax tree still says {@code User.PASSWORD}, and the constant's simple name is enough to
+     * find the field it stands for, so nothing here depends on the value having resolved.
+     */
+    private Set<String> fieldsToRemove(ExecutableElement method, Set<String> actualFieldNames) {
+        Set<String> names = new HashSet<String>();
+        for (ExpressionTree value : removeFieldsValues(method)) {
+            String fieldName = fieldNameOf(value, actualFieldNames);
+            if (fieldName != null) {
+                names.add(fieldName);
+            }
+        }
+        return names;
+    }
+
+    /**
+     * The field a value names, or null when a constant reference names none of the source class's.
+     *
+     * <p>Null rather than an error on purpose. {@code removeFields} is a {@code @FieldPath} member,
+     * so a constant belonging to the wrong class already produces a precise error once the file is
+     * analysed. Reporting here as well would not only duplicate it — an error raised from a
+     * processing round ends processing, and the constants {@code @Fields} injects never reach the
+     * symbol table, burying the real message under a cascade of "cannot find symbol".
+     *
+     * <p>A plain string still goes through the check below it, since nothing else would catch it.
+     */
+    private String fieldNameOf(ExpressionTree value, Set<String> actualFieldNames) {
+        if (value instanceof LiteralTree) {
+            Object literal = ((LiteralTree) value).getValue();
+            return FieldConstants.fieldNameOf(String.valueOf(literal));
+        }
+        String constant = constantNameOf(value);
+        if (constant == null) {
+            return null;
+        }
+        for (String fieldName : actualFieldNames) {
+            if (FieldConstants.nameFor(fieldName).equals(constant)) {
+                return fieldName;
+            }
+        }
+        return null;
+    }
+
+    private static String constantNameOf(ExpressionTree value) {
+        if (value instanceof MemberSelectTree) {
+            return ((MemberSelectTree) value).getIdentifier().toString();
+        }
+        if (value instanceof IdentifierTree) {
+            return ((IdentifierTree) value).getName().toString();
+        }
+        return null;
+    }
+
+    private List<ExpressionTree> removeFieldsValues(ExecutableElement method) {
+        List<ExpressionTree> values = new ArrayList<ExpressionTree>();
+        AnnotationTree annotation = annotationTreeOn(method);
+        if (annotation == null) {
+            return values;
+        }
+        for (ExpressionTree argument : annotation.getArguments()) {
+            if (!(argument instanceof AssignmentTree)) {
+                continue;
+            }
+            AssignmentTree assignment = (AssignmentTree) argument;
+            if (!"removeFields".equals(assignment.getVariable().toString())) {
+                continue;
+            }
+            ExpressionTree assigned = assignment.getExpression();
+            if (assigned instanceof NewArrayTree) {
+                values.addAll(((NewArrayTree) assigned).getInitializers());
+            } else {
+                values.add(assigned);
+            }
+        }
+        return values;
+    }
+
+    private AnnotationTree annotationTreeOn(ExecutableElement method) {
+        Trees trees = Trees.instance(processingEnv);
+        for (AnnotationMirror mirror : method.getAnnotationMirrors()) {
+            String name = mirror.getAnnotationType().toString();
+            if (GenerateDto.class.getCanonicalName().equals(name)) {
+                Tree tree = trees.getTree(method, mirror);
+                return tree instanceof AnnotationTree ? (AnnotationTree) tree : null;
+            }
+        }
+        return null;
     }
 
     /**
