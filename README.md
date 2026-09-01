@@ -169,9 +169,17 @@ being on the classpath.
 ## Building
 
 ```bash
-mvn clean install                                     # needs a JDK; profiles pick the right flags
-docker run --rm -v "$PWD":/app -w /app \
-  maven:3.9-eclipse-temurin-8 mvn clean test          # what CI actually runs
+mvn -B clean install
+```
+
+The profiles pick the right flags for whichever JDK you have. With no Maven or JDK installed, this is
+the same build CI runs, on a real Java 8:
+
+```bash
+docker volume create dg-m2
+
+docker run --rm -v "$PWD":/app -w /app -v dg-m2:/root/.m2 \
+  maven:3.9-eclipse-temurin-8 bash -c "mvn -B clean test"
 ```
 
 The `javac-internals-jdk8` profile adds `tools.jar`. `javac-internals-jdk9plus` passes the flags to
@@ -184,9 +192,10 @@ The IDE does not run the annotation processor, so without the plugin every gener
 as unresolved. The plugin supplies them as synthetic PSI and mirrors every diagnostic.
 
 ```bash
-cd idea-plugin
-./gradlew buildPlugin
+cd idea-plugin && ./gradlew buildPlugin
 ```
+
+The Gradle wrapper downloads its own Gradle, so this needs no local install.
 
 That produces `idea-plugin/build/distributions/dto-generator-fields.zip`. Install it with
 **Settings → Plugins → ⚙ → Install Plugin from Disk**. It registers three extension points —

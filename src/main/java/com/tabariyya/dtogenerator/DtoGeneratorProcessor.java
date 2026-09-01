@@ -14,10 +14,13 @@ import com.tabariyya.dtogenerator.annotations.AddAnnotation;
 import com.tabariyya.dtogenerator.annotations.Field;
 import com.tabariyya.dtogenerator.annotations.GenerateDto;
 import com.tabariyya.dtogenerator.fields.FieldConstants;
+import com.tabariyya.dtogenerator.fields.ProcessingEnvironments;
 
 import javax.annotation.processing.AbstractProcessor;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
+import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.MirroredTypeException;
@@ -36,6 +39,24 @@ import static javax.tools.Diagnostic.Kind.NOTE;
 
 @AutoService(Processor.class)
 public class DtoGeneratorProcessor extends AbstractProcessor {
+
+    /** Null when the compiler will not hand its trees over; the generator then falls back. */
+    private Trees trees;
+
+    @Override
+    public synchronized void init(ProcessingEnvironment processingEnv) {
+        super.init(processingEnv);
+        try {
+            trees = Trees.instance(ProcessingEnvironments.unwrap(processingEnv));
+        } catch (Throwable unavailable) {
+            trees = null;
+        }
+    }
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SourceVersion.latestSupported();
+    }
 
     @Override
     public Set<String> getSupportedAnnotationTypes() {
@@ -98,7 +119,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                         .map(field -> field.getSimpleName().toString())
                         .collect(Collectors.toSet());
 
-        Set<String> fieldsToRemove = fieldsToRemove(method, actualFieldNames);
+        Set<String> fieldsToRemove = fieldsToRemove(method, actualFieldNames, generateDto);
 
         for (String fieldToRemove : fieldsToRemove) {
             if (!actualFieldNames.contains(fieldToRemove)) {
@@ -179,13 +200,37 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
      * The syntax tree still says {@code User.PASSWORD}, and the constant's simple name is enough to
      * find the field it stands for, so nothing here depends on the value having resolved.
      */
-    private Set<String> fieldsToRemove(ExecutableElement method, Set<String> actualFieldNames) {
+    private Set<String> fieldsToRemove(
+            ExecutableElement method, Set<String> actualFieldNames, GenerateDto generateDto) {
+        if (trees == null) {
+            return declaredFieldsToRemove(generateDto);
+        }
         Set<String> names = new HashSet<>();
         for (ExpressionTree value : removeFieldsValues(method)) {
             String fieldName = fieldNameOf(value, actualFieldNames);
             if (fieldName != null) {
                 names.add(fieldName);
             }
+        }
+        return names;
+    }
+
+    /**
+     * Reads the values straight off the annotation, for a compiler that exposes no syntax tree.
+     *
+     * <p>Reading the tree is what avoids this: a constant injected during this same compilation is
+     * not resolved when the annotation is attributed, so the proxy throws rather than answering.
+     * Where no tree is available there is nothing better, and losing the removals beats failing the
+     * build over them.
+     */
+    private Set<String> declaredFieldsToRemove(GenerateDto generateDto) {
+        Set<String> names = new HashSet<>();
+        try {
+            for (String path : generateDto.removeFields()) {
+                names.add(FieldConstants.fieldNameOf(path));
+            }
+        } catch (RuntimeException unresolved) {
+            log(NOTE, "removeFields could not be read from the annotation: " + unresolved);
         }
         return names;
     }
@@ -253,7 +298,9 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
     }
 
     private AnnotationTree annotationTreeOn(ExecutableElement method) {
-        Trees trees = Trees.instance(processingEnv);
+        if (trees == null) {
+            return null;
+        }
         for (AnnotationMirror mirror : method.getAnnotationMirrors()) {
             String name = mirror.getAnnotationType().toString();
             if (GenerateDto.class.getCanonicalName().equals(name)) {

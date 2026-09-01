@@ -6,8 +6,6 @@ import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Proxy;
 import java.util.Set;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -48,7 +46,7 @@ public class FieldsProcessor extends AbstractProcessor {
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
-        ProcessingEnvironment javac = unwrap(processingEnv);
+        ProcessingEnvironment javac = ProcessingEnvironments.unwrap(processingEnv);
         validateFieldPaths(javac);
         loadInjector(javac);
     }
@@ -131,35 +129,5 @@ public class FieldsProcessor extends AbstractProcessor {
     private static String describe(Throwable failure) {
         String message = failure.getMessage();
         return failure.getClass().getSimpleName() + (message == null ? "" : ": " + message);
-    }
-
-    /**
-     * Gradle hands processors a proxy around the real environment; javac's own services can only be
-     * reached through the environment underneath it.
-     */
-    private static ProcessingEnvironment unwrap(ProcessingEnvironment processingEnv) {
-        ProcessingEnvironment current = processingEnv;
-        while (current instanceof Proxy) {
-            ProcessingEnvironment delegate = delegateOf(Proxy.getInvocationHandler(current));
-            if (delegate == null) {
-                return processingEnv;
-            }
-            current = delegate;
-        }
-        return current;
-    }
-
-    private static ProcessingEnvironment delegateOf(InvocationHandler handler) {
-        for (java.lang.reflect.Field field : handler.getClass().getDeclaredFields()) {
-            if (ProcessingEnvironment.class.isAssignableFrom(field.getType())) {
-                try {
-                    field.setAccessible(true);
-                    return (ProcessingEnvironment) field.get(handler);
-                } catch (Throwable inaccessible) {
-                    return null;
-                }
-            }
-        }
-        return null;
     }
 }
