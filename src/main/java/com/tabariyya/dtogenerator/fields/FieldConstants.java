@@ -3,11 +3,8 @@ package com.tabariyya.dtogenerator.fields;
 import java.util.List;
 
 /**
- * The naming rule, the path format and every diagnostic message, in one place.
- *
- * <p>The annotation processor and the IntelliJ plugin both compile against this class, so a field
- * resolves to the same constant name and the same path in the compiler and in the editor. Anything
- * either side needs to agree on belongs here rather than in one of them.
+ * The naming rule, the path format and every diagnostic message. The processor and the IntelliJ
+ * plugin both compile against this class, so anything the two must agree on belongs here.
  */
 public final class FieldConstants {
 
@@ -105,9 +102,8 @@ public final class FieldConstants {
     };
 
     /**
-     * Names the flags as JVM arguments rather than compiler options on purpose. The processor runs
-     * inside the compiler's JVM, so only that JVM's module graph decides what it can reach — and
-     * javac rejects a plain {@code add-exports} compiler option outright when the target is 8.
+     * JVM arguments rather than compiler options on purpose: the processor runs inside the compiler's
+     * JVM, and javac rejects a plain {@code add-exports} option when the target is 8.
      */
     public static String injectionUnavailableMessage(String reason) {
         StringBuilder flags = new StringBuilder();

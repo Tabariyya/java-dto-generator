@@ -6,12 +6,8 @@ import java.lang.reflect.Proxy;
 import javax.annotation.processing.ProcessingEnvironment;
 
 /**
- * Finds the real javac environment behind whatever a build tool wrapped it in.
- *
- * <p>Both Gradle and IntelliJ's JPS hand processors a stand-in rather than javac's own
- * {@code ProcessingEnvironment}, and javac's services reject it: {@code Trees.instance} on a wrapper
- * throws {@code IllegalArgumentException}, which is a failed build for everyone using this library
- * under those tools. Each wrapper has to be unwrapped its own way.
+ * Finds the real javac environment behind whatever a build tool wrapped it in. Gradle and IntelliJ's
+ * JPS each hand processors a different stand-in, and {@code Trees.instance} throws on both.
  */
 public final class ProcessingEnvironments {
 
@@ -19,13 +15,12 @@ public final class ProcessingEnvironments {
 
     private ProcessingEnvironments() {}
 
-    /** The environment javac itself created, or the one given if it is not wrapped. */
     public static ProcessingEnvironment unwrap(ProcessingEnvironment processingEnv) {
         ProcessingEnvironment unwrapped = throughJps(processingEnv);
         return unwrapped != null ? unwrapped : throughProxy(processingEnv);
     }
 
-    /** JPS documents this entry point; it is on the processor's own class loader when JPS is running. */
+    /** The entry point JPS documents for this. */
     private static ProcessingEnvironment throughJps(ProcessingEnvironment processingEnv) {
         try {
             Class<?> wrappers = processingEnv.getClass().getClassLoader().loadClass(JPS_WRAPPERS);

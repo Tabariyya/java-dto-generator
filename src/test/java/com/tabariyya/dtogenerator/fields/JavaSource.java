@@ -4,7 +4,7 @@ import java.net.URI;
 import javax.tools.SimpleJavaFileObject;
 
 /** A source file held in memory, written a line at a time so the tests read like Java. */
-final class JavaSource extends SimpleJavaFileObject {
+public final class JavaSource extends SimpleJavaFileObject {
 
     private final String content;
 
@@ -13,7 +13,7 @@ final class JavaSource extends SimpleJavaFileObject {
         this.content = content;
     }
 
-    static JavaSource of(String qualifiedName, String... lines) {
+    public static JavaSource of(String qualifiedName, String... lines) {
         StringBuilder source = new StringBuilder();
         for (String line : lines) {
             source.append(line).append('\n');

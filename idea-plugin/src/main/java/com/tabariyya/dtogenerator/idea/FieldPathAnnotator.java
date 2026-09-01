@@ -28,11 +28,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Shows every {@code @FieldPath} violation in the editor, with the message the compiler would print.
- *
- * <p>Kept deliberately parallel to {@code FieldPathValidator}: same checks, same order, same strings
- * out of {@link FieldConstants}. Where the two are written against different models — javac's element
- * model here, PSI there — it is only the model access that differs.
+ * Shows every {@code @FieldPath} violation in the editor. Kept deliberately parallel to
+ * {@code FieldPathValidator}: same checks, same order, same strings out of {@link FieldConstants},
+ * differing only in that this reads PSI where that reads javac's element model.
  */
 public class FieldPathAnnotator implements Annotator {
 
@@ -90,10 +88,7 @@ public class FieldPathAnnotator implements Annotator {
         report(fieldPath, FieldConstants.unsupportedTypeMessage(type.getCanonicalText()), holder);
     }
 
-    /**
-     * The class every path in this argument must name: empty when unconstrained, or null when the use
-     * site cannot supply one — in which case the reason has already been reported.
-     */
+    /** Empty when unconstrained; null when the use site cannot supply one, already reported. */
     private static @Nullable String expectedOwner(
             PsiAnnotation fieldPath, PsiNameValuePair pair, AnnotationHolder holder) {
         String fixed = fixedOwner(fieldPath);
@@ -118,7 +113,7 @@ public class FieldPathAnnotator implements Annotator {
         return resolved.getQualifiedName();
     }
 
-    /** The declaration an annotation is applied to, reached through its modifier list. */
+    /** Reached through the annotation's modifier list, so only a direct application counts. */
     private static @Nullable PsiElement annotatedDeclaration(PsiNameValuePair pair) {
         PsiAnnotation annotation = PsiTreeUtil.getParentOfType(pair, PsiAnnotation.class);
         PsiAnnotationOwner owner = annotation == null ? null : annotation.getOwner();

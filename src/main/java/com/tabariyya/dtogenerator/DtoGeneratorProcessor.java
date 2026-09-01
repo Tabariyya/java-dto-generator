@@ -190,15 +190,10 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
     }
 
     /**
-     * The field names named by {@code removeFields}, read from the annotation's syntax tree rather
-     * than from its value.
-     *
-     * <p>Reading {@code generateDto.removeFields()} would be simpler but cannot work here. javac
-     * attributes annotation arguments before any processor runs, so a constant that {@code @Fields}
-     * injects during this same compilation does not exist yet at that point; the argument is
-     * recorded as an error and the annotation proxy throws {@code AnnotationTypeMismatchException}.
-     * The syntax tree still says {@code User.PASSWORD}, and the constant's simple name is enough to
-     * find the field it stands for, so nothing here depends on the value having resolved.
+     * Read from the annotation's syntax tree, not its value. javac attributes annotation arguments
+     * before any processor runs, so a constant {@code @Fields} injects in this same compilation does
+     * not exist yet and the proxy throws {@code AnnotationTypeMismatchException}. The tree still says
+     * {@code User.PASSWORD}, and that simple name is enough to find the field.
      */
     private Set<String> fieldsToRemove(
             ExecutableElement method, Set<String> actualFieldNames, GenerateDto generateDto) {
@@ -215,14 +210,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
         return names;
     }
 
-    /**
-     * Reads the values straight off the annotation, for a compiler that exposes no syntax tree.
-     *
-     * <p>Reading the tree is what avoids this: a constant injected during this same compilation is
-     * not resolved when the annotation is attributed, so the proxy throws rather than answering.
-     * Where no tree is available there is nothing better, and losing the removals beats failing the
-     * build over them.
-     */
+    /** For a compiler exposing no syntax tree; losing the removals beats failing the build. */
     private Set<String> declaredFieldsToRemove(GenerateDto generateDto) {
         Set<String> names = new HashSet<>();
         try {
@@ -236,15 +224,10 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
     }
 
     /**
-     * The field a value names, or null when a constant reference names none of the source class's.
-     *
-     * <p>Null rather than an error on purpose. {@code removeFields} is a {@code @FieldPath} member,
-     * so a constant belonging to the wrong class already produces a precise error once the file is
-     * analysed. Reporting here as well would not only duplicate it — an error raised from a
-     * processing round ends processing, and the constants {@code @Fields} injects never reach the
-     * symbol table, burying the real message under a cascade of "cannot find symbol".
-     *
-     * <p>A plain string still goes through the check below it, since nothing else would catch it.
+     * Null rather than an error on purpose: {@code removeFields} is a {@code @FieldPath} member, so a
+     * wrong-class constant already errors precisely after analysis. Reporting here too would end
+     * processing before the injected constants reach the symbol table, burying that message under a
+     * cascade of "cannot find symbol". A plain string still goes through the check below.
      */
     private String fieldNameOf(ExpressionTree value, Set<String> actualFieldNames) {
         if (value instanceof LiteralTree) {
@@ -571,15 +554,35 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
         return false;
     }
 
+    /** What Java 8 leaves behind once the annotation itself is removed. */
+    private static final Pattern ANNOTATED_TYPE = Pattern.compile("\\(\\s*::\\s*([^()]*)\\)");
+
     private static final Pattern FQN_PATTERN =
             Pattern.compile("[a-zA-Z_$][a-zA-Z0-9_$]*(?:\\.[a-zA-Z_$][a-zA-Z0-9_$]*)+");
 
-    private String cleanTypeSignature(String raw) {
+    /**
+     * Java 8 prints an annotated type as {@code (@NotBlank :: java.lang.String)}, a notation dropped
+     * in Java 9. Removing the annotation is not enough there: the punctuation survives and reaches
+     * the generated file as {@code private ( :: String) name;}, which does not parse.
+     */
+    static String cleanTypeSignature(String raw) {
         if (raw == null) return "";
         String cleaned = raw.replaceAll("@[a-zA-Z_$][a-zA-Z0-9_$.]*(?:\\((?:[^)(]+|\\([^)(]*\\))*\\))?", "");
+        cleaned = unwrapAnnotatedTypes(cleaned);
         cleaned = cleaned.replaceAll("\\s*\\.\\s*", ".");
         cleaned = cleaned.replaceAll("\\s+", " ").trim();
         return cleaned;
+    }
+
+    /** Innermost first, so a nested {@code List<(@B :: String)>} unwraps at every level. */
+    private static String unwrapAnnotatedTypes(String cleaned) {
+        String previous = null;
+        String current = cleaned;
+        while (!current.equals(previous)) {
+            previous = current;
+            current = ANNOTATED_TYPE.matcher(current).replaceAll("$1");
+        }
+        return current;
     }
 
     private List<String> extractFqns(String typeSignature) {

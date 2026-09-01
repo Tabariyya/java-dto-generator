@@ -26,15 +26,12 @@ import javax.lang.model.util.ElementFilter;
 import javax.tools.Diagnostic;
 
 /**
- * Reports every {@link FieldPath} violation as a compile error.
+ * Reports every {@link FieldPath} violation as a compile error, using only supported compiler API so
+ * it needs none of the flags injection does.
  *
- * <p>Written entirely against supported compiler API — {@code com.sun.source} and
- * {@code javax.lang.model} — so it needs none of the {@code --add-exports} flags {@link Fields}
- * injection does, and works unchanged from Java 8 onwards.
- *
- * <p>It runs from a {@code TaskListener} once a file finishes {@code ANALYZE}, not during the
- * annotation processing round: annotation arguments are not attributed yet while processing runs, so
- * every value would read as {@code <error>}.
+ * <p>It runs once a file finishes {@code ANALYZE}, not during the processing round: annotation
+ * arguments are not attributed yet while processing runs, so every value would read as
+ * {@code <error>}.
  */
 final class FieldPathValidator extends TreePathScanner<Void, Void> {
 
@@ -99,10 +96,7 @@ final class FieldPathValidator extends TreePathScanner<Void, Void> {
         report(position, FieldConstants.unsupportedTypeMessage(type.toString()));
     }
 
-    /**
-     * The class every path on this member must name: empty when unconstrained, or null when the use
-     * site cannot supply one — in which case the reason has already been reported.
-     */
+    /** Empty when unconstrained; null when the use site cannot supply one, already reported. */
     private String expectedOwner(FieldPath fieldPath, ExecutableElement member, TreePath annotationPath) {
         String fixed = fixedOwner(fieldPath);
         if (!fieldPath.returnType()) {
@@ -138,7 +132,7 @@ final class FieldPathValidator extends TreePathScanner<Void, Void> {
         return ((TypeElement) returnElement).getQualifiedName().toString();
     }
 
-    /** The declaration an annotation is applied to, reached through its modifiers. */
+    /** Reached through the annotation's modifiers, so only a direct application counts. */
     private static TreePath annotatedDeclaration(TreePath annotationPath) {
         TreePath modifiers = annotationPath.getParentPath();
         if (modifiers == null || !(modifiers.getLeaf() instanceof ModifiersTree)) {
@@ -201,7 +195,7 @@ final class FieldPathValidator extends TreePathScanner<Void, Void> {
         return constant instanceof String ? (String) constant : null;
     }
 
-    /** The annotation member an argument assigns to, resolving the {@code value} shorthand. */
+    /** Resolves the {@code value} shorthand as well as a named argument. */
     private ExecutableElement memberOf(AnnotationTree annotation, TreePath argumentPath) {
         if (argumentPath.getLeaf() instanceof AssignmentTree) {
             ExpressionTree name = ((AssignmentTree) argumentPath.getLeaf()).getVariable();

@@ -5,10 +5,8 @@ import java.net.URL;
 import java.net.URLClassLoader;
 
 /**
- * Reads an injected constant back out of the compiled class file.
- *
- * <p>Asserting on the class file rather than on a source file that uses the constant is what proves
- * the constant is real: it has to have survived as a {@code ConstantValue} to be readable here.
+ * Reads an injected constant out of the compiled class file, which is what proves it is real: it has
+ * to have survived as a {@code ConstantValue} to be readable here.
  */
 final class CompiledConstants {
 
@@ -18,7 +16,7 @@ final class CompiledConstants {
         this.classesDir = classesDir;
     }
 
-    /** The constant's value, or null when the class does not declare it. */
+    /** Null when the class does not declare it. */
     String of(String qualifiedClassName, String constantName) {
         URLClassLoader loader = null;
         try {

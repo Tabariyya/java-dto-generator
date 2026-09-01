@@ -6,7 +6,7 @@ import java.util.Locale;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
 
-final class Compilation {
+public final class Compilation {
 
     private final boolean success;
     private final List<Diagnostic<? extends JavaFileObject>> diagnostics;
@@ -16,15 +16,15 @@ final class Compilation {
         this.diagnostics = diagnostics;
     }
 
-    boolean succeeded() {
+    public boolean succeeded() {
         return success;
     }
 
-    List<String> errors() {
+    public List<String> errors() {
         return messagesOf(Diagnostic.Kind.ERROR);
     }
 
-    List<String> warnings() {
+    public List<String> warnings() {
         return messagesOf(Diagnostic.Kind.WARNING);
     }
 

@@ -21,12 +21,10 @@ import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 
 /**
- * Appends the constants to the annotated class's syntax tree, the way Lombok adds accessors.
- *
- * <p>Every {@code com.sun.tools.javac} reference in the library is confined to this class. It is
- * named, never imported, by {@link FieldsProcessor}, so on a compiler that does not export those
- * packages the failure is a caught {@code IllegalAccessError} at load time rather than a broken
- * build for everyone with this library on their classpath.
+ * Appends the constants to the class's syntax tree, the way Lombok adds accessors. Every
+ * {@code com.sun.tools.javac} reference in the library is confined here, and {@link FieldsProcessor}
+ * names this class rather than importing it, so a compiler that closes those packages produces a
+ * caught {@code IllegalAccessError} instead of a broken build.
  */
 @SuppressWarnings("unused")
 final class JavacFieldsInjector implements FieldsInjector {
@@ -73,7 +71,7 @@ final class JavacFieldsInjector implements FieldsInjector {
         }
     }
 
-    /** Constant name to the fields wanting it, so a name wanted by two fields is visible as one. */
+    /** Constant name to the fields wanting it, so a name two fields want is visible as one. */
     private Map<String, List<String>> candidates(
             List<String> fieldNames, Set<String> declaredNames, TypeElement type) {
         Map<String, List<String>> byConstant = new LinkedHashMap<>();
@@ -93,8 +91,8 @@ final class JavacFieldsInjector implements FieldsInjector {
     }
 
     /**
-     * Read before anything is appended. Checking the class's own declarations afterwards would see
-     * the constants this run just added and report every one of them as a name already taken.
+     * Read before anything is appended: afterwards this would see the constants just added and
+     * report every one as a name already taken.
      */
     private static Set<String> declaredNamesOf(JCClassDecl classDecl) {
         Set<String> declared = new LinkedHashSet<>();

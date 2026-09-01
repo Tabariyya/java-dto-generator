@@ -19,14 +19,10 @@ import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 
 /**
- * Runs both halves of the field-path system: {@link FieldPath} validation, which works everywhere,
- * and {@link Fields} constant injection, which needs javac internals.
- *
- * <p>The two are deliberately kept apart. Validation is written against supported compiler API and is
- * wired up here directly. Injection is reached only through {@link FieldsInjector}, loaded by name
- * inside a {@code try}, so a compiler that refuses access to its own syntax tree costs a warning
- * rather than the build — this class never mentions a {@code com.sun.tools.javac} type, so nothing
- * fails to resolve when it is loaded.
+ * Runs both halves of the system. Validation uses supported API and is wired up here. Injection is
+ * reached only through {@link FieldsInjector}, loaded by name inside a {@code try}, so this class
+ * never mentions a {@code com.sun.tools.javac} type and a compiler that refuses access to its own
+ * syntax tree costs a warning rather than the build.
  */
 @AutoService(Processor.class)
 @SupportedAnnotationTypes("*")
@@ -53,13 +49,9 @@ public class FieldsProcessor extends AbstractProcessor {
     }
 
     /**
-     * Attaches the validator to the compiler's task queue. Does nothing at all when this is not
-     * javac, or is a javac that will not hand its queue over: paths then go unchecked, which is the
-     * same position a build was in before this library existed.
-     *
-     * <p>The empty {@code started} below is not redundant, whatever an IDE resolving against a
-     * modern JDK says: {@code TaskListener} only gained default methods in Java 9, and this library
-     * still compiles on 8, where leaving it out does not compile.
+     * Silently leaves paths unchecked when this is not javac. The empty {@code started} below is not
+     * redundant, whatever an IDE resolving against a modern JDK says: {@code TaskListener} only
+     * gained default methods in Java 9, and this still compiles on 8.
      */
     private void validateFieldPaths(final ProcessingEnvironment javac) {
         final Trees trees;
@@ -128,9 +120,8 @@ public class FieldsProcessor extends AbstractProcessor {
     }
 
     /**
-     * This listener runs for every class in every compilation that has this library on the
-     * classpath, including the overwhelming majority that never mention {@link FieldPath}. A defect
-     * in the validator must therefore cost a warning rather than someone else's build.
+     * The listener runs for every class in every build with this library on the classpath, so a
+     * defect in the validator must cost a warning rather than someone else's build.
      */
     private void reportValidatorFailure(Throwable failure) {
         if (!reportedValidatorFailure) {

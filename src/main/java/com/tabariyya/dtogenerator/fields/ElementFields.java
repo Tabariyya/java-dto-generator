@@ -12,17 +12,14 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 
 /**
- * Which instance fields a class has, according to the element model.
- *
- * <p>Shared by the injector and the validator on purpose: one generates the constants and the other
- * decides whether a path names a real field, so the two must walk the hierarchy the same way. Two
- * private copies of this walk is how the compiler and the editor drifted apart before.
+ * Shared by the injector and the validator on purpose: one generates the constants and the other
+ * decides whether a path names a real field, so both must walk the hierarchy the same way.
  */
 final class ElementFields {
 
     private ElementFields() {}
 
-    /** Instance field names, the class's own first, then each superclass's, without duplicates. */
+    /** The class's own first, then each superclass's, without duplicates. */
     static List<String> instanceNamesOf(TypeElement type) {
         Set<String> fieldNames = new LinkedHashSet<>();
         Set<String> visited = new LinkedHashSet<>();

@@ -12,20 +12,16 @@ import java.lang.annotation.Target;
 public @interface GenerateDto {
 
     /**
-     * Fields of the source class to leave out of the generated DTO.
-     *
-     * <p>The source class is this method's return type, so {@link FieldPath#returnType()} checks
-     * every value against it: a field of another class, or a name that is not a field at all, is a
-     * compile error rather than a silently ignored string.
+     * Fields of the source class to leave out. The source class is this method's return type, so
+     * {@link FieldPath#returnType()} checks every value against it.
      *
      * <pre>
      * &#64;GenerateDto(removeFields = {User.PASSWORD})   // User must be annotated {@link Fields}
      * User getUser();
      * </pre>
      *
-     * <p>Bare field names — {@code removeFields = {"password"}} — are still understood by the
-     * generator, but no longer accepted by the compiler, because nothing checks that such a name
-     * survives a rename of the field.
+     * <p>Bare names such as {@code {"password"}} no longer compile: nothing checks that such a string
+     * survives a rename.
      */
     @FieldPath(returnType = true)
     String[] removeFields() default {};
