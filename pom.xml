@@ -93,7 +93,9 @@
         <profile>
             <id>javac-internals-jdk8</id>
             <activation>
-                <jdk>1.8</jdk>
+                <file>
+                    <exists>${java.home}/../lib/tools.jar</exists>
+                </file>
             </activation>
             <dependencies>
                 <dependency>
@@ -107,41 +109,25 @@
         </profile>
 
         <!--
-            javac refuses an add-exports compiler option next to target 8, so on a JDK 9+
-            toolchain the access has to come from the JVM running the compiler instead: a forked
-            javac carrying the flags with -J, and the same flags on the test JVM, which compiles
-            in process.
+            The processor runs inside the compiler's JVM, so it is that JVM's module graph that has
+            to open javac up, not a compiler option: javac rejects an add-exports option outright
+            next to target 8, and does not need one, since target 8 turns module access enforcement
+            off for the compilation anyway. Only the test JVM needs the flags, because the tests
+            invoke the processor by compiling in process.
         -->
         <profile>
             <id>javac-internals-jdk9plus</id>
             <activation>
                 <jdk>[9,)</jdk>
             </activation>
-            <properties>
-                <javac.internals.exports>--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</javac.internals.exports>
-            </properties>
             <build>
                 <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-compiler-plugin</artifactId>
-                        <version>3.14.0</version>
-                        <configuration>
-                            <fork>true</fork>
-                            <compilerArgs>
-                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
-                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
-                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
-                                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
-                            </compilerArgs>
-                        </configuration>
-                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
                         <version>3.1.2</version>
                         <configuration>
-                            <argLine>${javac.internals.exports}</argLine>
+                            <argLine>--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</argLine>
                         </configuration>
                     </plugin>
                 </plugins>

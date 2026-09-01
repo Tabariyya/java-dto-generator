@@ -53,12 +53,22 @@ public class FieldsProcessor extends AbstractProcessor {
         loadInjector(javac);
     }
 
+    /**
+     * Attaches the validator to the compiler's task queue. Does nothing at all when this is not
+     * javac, or is a javac that will not hand its queue over: paths then go unchecked, which is the
+     * same position a build was in before this library existed.
+     *
+     * <p>The empty {@code started} below is not redundant, whatever an IDE resolving against a
+     * modern JDK says: {@code TaskListener} only gained default methods in Java 9, and this library
+     * still compiles on 8, where leaving it out does not compile.
+     */
     private void validateFieldPaths(final ProcessingEnvironment javac) {
         final Trees trees;
         try {
             trees = Trees.instance(javac);
             JavacTask.instance(javac).addTaskListener(new TaskListener() {
                 @Override
+                @SuppressWarnings("RedundantMethodOverride")
                 public void started(TaskEvent event) {}
 
                 @Override
@@ -72,8 +82,7 @@ public class FieldsProcessor extends AbstractProcessor {
                     }
                 }
             });
-        } catch (Throwable failure) {
-            // Not javac, or a compiler that hides its task queue: paths simply go unchecked.
+        } catch (Throwable ignored) {
         }
     }
 

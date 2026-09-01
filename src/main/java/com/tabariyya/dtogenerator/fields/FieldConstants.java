@@ -14,6 +14,7 @@ public final class FieldConstants {
     /** Separates the owning class from the field name in a path. */
     public static final char SEPARATOR = '#';
 
+    @SuppressWarnings("unused")
     public static final String ANNOTATION = "com.tabariyya.dtogenerator.fields.Fields";
 
     public static final String FIELD_PATH_ANNOTATION = "com.tabariyya.dtogenerator.fields.FieldPath";
@@ -91,10 +92,11 @@ public final class FieldConstants {
     }
 
     public static String collisionMessage(String constantName, List<String> fieldNames) {
-        return "no constant is generated for " + constantName + ": fields " + join(fieldNames) + " all map to it";
+        return "no constant is generated for " + constantName + ": fields " + String.join(", ", fieldNames)
+                + " all map to it";
     }
 
-    /** The javac packages injection needs, in the order they are usually written. */
+    /** The javac packages injection needs. */
     public static final String[] REQUIRED_EXPORTS = {
         "jdk.compiler/com.sun.tools.javac.code",
         "jdk.compiler/com.sun.tools.javac.processing",
@@ -145,17 +147,5 @@ public final class FieldConstants {
     public static String unusableReturnTypeMessage(String member, String returnType) {
         return "@FieldPath(returnType = true) on " + member + " cannot be checked against the return type "
                 + returnType + ", which is not a class";
-    }
-
-    /** {@code String.join} is fine on 8, but this keeps the message identical to the plugin's. */
-    private static String join(List<String> values) {
-        StringBuilder joined = new StringBuilder();
-        for (String value : values) {
-            if (joined.length() != 0) {
-                joined.append(", ");
-            }
-            joined.append(value);
-        }
-        return joined.toString();
     }
 }

@@ -39,7 +39,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
 
     @Override
     public Set<String> getSupportedAnnotationTypes() {
-        Set<String> types = new HashSet<String>();
+        Set<String> types = new HashSet<>();
         types.add(GenerateDto.class.getCanonicalName());
         return types;
     }
@@ -71,6 +71,9 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
 
     private void processMethod(ExecutableElement method) {
         GenerateDto generateDto = method.getAnnotation(GenerateDto.class);
+        if (generateDto == null) {
+            return;
+        }
 
         String methodName = method.getSimpleName().toString();
         String newClassName =
@@ -106,7 +109,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
             }
         }
 
-        List<DtoField> fields = new ArrayList<DtoField>();
+        List<DtoField> fields = new ArrayList<>();
 
         for (VariableElement existingField : sourceFields) {
 
@@ -119,7 +122,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
             String existingFieldFqn = cleanTypeSignature(existingField.asType().toString());
 
             List<AnnotationMirror> annotations =
-                    new ArrayList<AnnotationMirror>();
+                    new ArrayList<>();
 
             for (AnnotationMirror annotation :
                     existingField.getAnnotationMirrors()) {
@@ -149,7 +152,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                 continue;
             }
 
-            List<String> rawAnnotations = new ArrayList<String>();
+            List<String> rawAnnotations = new ArrayList<>();
             for (AddAnnotation addAnnotation : dtoField.annotations()) {
                 String fqn = getAddAnnotationTypeName(addAnnotation);
                 rawAnnotations.add(buildRawAnnotation(fqn, addAnnotation.params()));
@@ -158,7 +161,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
             fields.add(new DtoField(
                     dtoField.name(),
                     getTypeName(dtoField),
-                    Collections.<AnnotationMirror>emptyList(),
+                    Collections.emptyList(),
                     rawAnnotations));
         }
 
@@ -177,7 +180,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
      * find the field it stands for, so nothing here depends on the value having resolved.
      */
     private Set<String> fieldsToRemove(ExecutableElement method, Set<String> actualFieldNames) {
-        Set<String> names = new HashSet<String>();
+        Set<String> names = new HashSet<>();
         for (ExpressionTree value : removeFieldsValues(method)) {
             String fieldName = fieldNameOf(value, actualFieldNames);
             if (fieldName != null) {
@@ -226,7 +229,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
     }
 
     private List<ExpressionTree> removeFieldsValues(ExecutableElement method) {
-        List<ExpressionTree> values = new ArrayList<ExpressionTree>();
+        List<ExpressionTree> values = new ArrayList<>();
         AnnotationTree annotation = annotationTreeOn(method);
         if (annotation == null) {
             return values;
@@ -266,7 +269,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
      * ordered superclass-first. A subclass field shadowing a superclass field wins, keeping the superclass position.
      */
     private List<VariableElement> collectInstanceFields(TypeElement sourceType) {
-        Deque<TypeElement> hierarchy = new ArrayDeque<TypeElement>();
+        Deque<TypeElement> hierarchy = new ArrayDeque<>();
 
         for (TypeElement current = sourceType; current != null; ) {
             hierarchy.addFirst(current);
@@ -285,7 +288,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
             current = superElement;
         }
 
-        Map<String, VariableElement> fields = new LinkedHashMap<String, VariableElement>();
+        Map<String, VariableElement> fields = new LinkedHashMap<>();
         for (TypeElement type : hierarchy) {
             for (VariableElement field : ElementFilter.fieldsIn(type.getEnclosedElements())) {
                 if (!field.getModifiers().contains(Modifier.STATIC)) {
@@ -294,7 +297,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
             }
         }
 
-        return new ArrayList<VariableElement>(fields.values());
+        return new ArrayList<>(fields.values());
     }
 
     private String getExtendsTypeName(GenerateDto generateDto) {
@@ -346,13 +349,12 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                     processingEnv.getFiler()
                             .createSourceFile(qualifiedClassName);
 
-            Writer writer = file.openWriter();
-            try {
+            try (Writer writer = file.openWriter()) {
                 writer.write("package " + packageName + ";\n\n");
 
                 boolean hasSuperclass = !extendsFqn.equals("java.lang.Object");
 
-                Set<String> imports = new TreeSet<String>();
+                Set<String> imports = new TreeSet<>();
 
                 if (hasSuperclass && needsImport(packageName(extendsFqn), packageName)) {
                     imports.add(extendsFqn);
@@ -449,8 +451,6 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
 
                 writer.write("}\n");
 
-            } finally {
-                writer.close();
             }
 
         } catch (Exception e) {
@@ -486,7 +486,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
         return sb.toString();
     }
 
-    // Extracts the FQN from a raw annotation string like "@com.example.Foo(value = 1)"
+    // "@com.example.Foo(value = 1)" -> "com.example.Foo"
     private String extractRawAnnotationFqn(String raw) {
         int start = raw.startsWith("@") ? 1 : 0;
         int end = raw.indexOf('(');
@@ -494,7 +494,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
         return raw.substring(start, end).trim();
     }
 
-    // Replaces FQN with simple name: "@com.example.Foo(x)" → "@Foo(x)"
+    // "@com.example.Foo(x)" -> "@Foo(x)"
     private String renderRawAnnotation(String raw) {
         String fqn = extractRawAnnotationFqn(raw);
         String simple = simpleName(fqn);
@@ -537,7 +537,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
 
     private List<String> extractFqns(String typeSignature) {
         String cleaned = cleanTypeSignature(typeSignature);
-        List<String> fqns = new ArrayList<String>();
+        List<String> fqns = new ArrayList<>();
         Matcher matcher = FQN_PATTERN.matcher(cleaned);
         while (matcher.find()) {
             fqns.add(matcher.group());
@@ -571,29 +571,6 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
         return !packageName.isEmpty()
                 && !packageName.equals("java.lang")
                 && !packageName.equals(currentPackage);
-    }
-
-    private static class DtoField {
-        final String name;
-        final String typeFqn;
-        final List<AnnotationMirror> annotations;
-        final List<String> rawAnnotations;
-
-        DtoField(String name,
-                 String typeFqn,
-                 List<AnnotationMirror> annotations) {
-            this(name, typeFqn, annotations, Collections.<String>emptyList());
-        }
-
-        DtoField(String name,
-                 String typeFqn,
-                 List<AnnotationMirror> annotations,
-                 List<String> rawAnnotations) {
-            this.name = name;
-            this.typeFqn = typeFqn;
-            this.annotations = annotations;
-            this.rawAnnotations = rawAnnotations;
-        }
     }
 
     private void log(Diagnostic.Kind level, String message) {

@@ -28,6 +28,7 @@ import javax.tools.Diagnostic;
  * packages the failure is a caught {@code IllegalAccessError} at load time rather than a broken
  * build for everyone with this library on their classpath.
  */
+@SuppressWarnings("unused")
 final class JavacFieldsInjector implements FieldsInjector {
 
     private ProcessingEnvironment processingEnv;
@@ -35,7 +36,7 @@ final class JavacFieldsInjector implements FieldsInjector {
     private TreeMaker maker;
     private Names names;
 
-    private final Set<String> injected = new LinkedHashSet<String>();
+    private final Set<String> injected = new LinkedHashSet<>();
 
     @Override
     public void init(ProcessingEnvironment processingEnv) {
@@ -75,7 +76,7 @@ final class JavacFieldsInjector implements FieldsInjector {
     /** Constant name to the fields wanting it, so a name wanted by two fields is visible as one. */
     private Map<String, List<String>> candidates(
             List<String> fieldNames, Set<String> declaredNames, TypeElement type) {
-        Map<String, List<String>> byConstant = new LinkedHashMap<String, List<String>>();
+        Map<String, List<String>> byConstant = new LinkedHashMap<>();
         for (String fieldName : fieldNames) {
             if (FieldConstants.namesItsOwnConstant(fieldName)) {
                 warn(FieldConstants.nameIsAlreadyConstantMessage(fieldName), type);
@@ -86,12 +87,7 @@ final class JavacFieldsInjector implements FieldsInjector {
                 warn(FieldConstants.nameTakenMessage(constant, fieldName), type);
                 continue;
             }
-            List<String> wanting = byConstant.get(constant);
-            if (wanting == null) {
-                wanting = new ArrayList<String>();
-                byConstant.put(constant, wanting);
-            }
-            wanting.add(fieldName);
+            byConstant.computeIfAbsent(constant, name -> new ArrayList<>()).add(fieldName);
         }
         return byConstant;
     }
@@ -101,7 +97,7 @@ final class JavacFieldsInjector implements FieldsInjector {
      * the constants this run just added and report every one of them as a name already taken.
      */
     private static Set<String> declaredNamesOf(JCClassDecl classDecl) {
-        Set<String> declared = new LinkedHashSet<String>();
+        Set<String> declared = new LinkedHashSet<>();
         for (JCTree member : classDecl.defs) {
             if (member instanceof JCVariableDecl) {
                 declared.add(((JCVariableDecl) member).name.toString());

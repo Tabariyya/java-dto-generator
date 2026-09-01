@@ -24,8 +24,8 @@ final class ElementFields {
 
     /** Instance field names, the class's own first, then each superclass's, without duplicates. */
     static List<String> instanceNamesOf(TypeElement type) {
-        Set<String> fieldNames = new LinkedHashSet<String>();
-        Set<String> visited = new LinkedHashSet<String>();
+        Set<String> fieldNames = new LinkedHashSet<>();
+        Set<String> visited = new LinkedHashSet<>();
         for (TypeElement current = type;
                 current != null && visited.add(current.getQualifiedName().toString());
                 current = superclassOf(current)) {
@@ -35,11 +35,7 @@ final class ElementFields {
                 }
             }
         }
-        return new ArrayList<String>(fieldNames);
-    }
-
-    static boolean hasInstanceField(TypeElement type, String fieldName) {
-        return instanceNamesOf(type).contains(fieldName);
+        return new ArrayList<>(fieldNames);
     }
 
     /** The superclass to continue the walk with, or null at the top or at a JDK class. */

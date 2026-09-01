@@ -46,13 +46,10 @@ public class FieldsAnnotator implements Annotator {
         }
         FieldsAugmentProvider.candidates(psiClass, declared).forEach((constant, colliding) -> {
             if (colliding.size() > 1) {
-                report(holder, fields, FieldConstants.collisionMessage(constant, namesOf(colliding)));
+                List<String> names = colliding.stream().map(PsiField::getName).toList();
+                report(holder, fields, FieldConstants.collisionMessage(constant, names));
             }
         });
-    }
-
-    private static List<String> namesOf(List<PsiField> fields) {
-        return fields.stream().map(PsiField::getName).toList();
     }
 
     private static void report(AnnotationHolder holder, PsiAnnotation fields, String message) {

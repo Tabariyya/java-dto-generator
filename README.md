@@ -154,10 +154,12 @@ variable).
 
 They are JVM arguments, not compiler options, and the difference is not cosmetic:
 
-- The processor runs **inside the compiler's own JVM**, so only that JVM's module graph decides what
-  it can reach. A plain `--add-exports` compiler option opens packages to the code being compiled,
-  which is a different thing entirely.
-- javac **rejects** a plain `--add-exports` alongside `target 8` outright:
+- The processor **runs inside the compiler's own JVM**, so only that JVM's module graph decides what
+  it can reach. A compiler option governs the code being compiled — a different thing entirely, and
+  not the thing that is blocked here.
+- Compiling against the javac internals needs no flags at all: `target 8` turns module access
+  enforcement off for the compilation. Only *running* the processor is blocked.
+- Which is also why javac **rejects** a plain `--add-exports` alongside `target 8`:
   `error: option --add-exports not allowed with target 8`.
 
 Without the flags, `@Fields` generates nothing and reports one warning naming them. It never fails
@@ -172,8 +174,9 @@ docker run --rm -v "$PWD":/app -w /app \
   maven:3.9-eclipse-temurin-8 mvn clean test          # what CI actually runs
 ```
 
-The `javac-internals-jdk8` profile adds `tools.jar`; `javac-internals-jdk9plus` forks the compiler
-and passes the flags above, including to the test JVM, which compiles in process.
+The `javac-internals-jdk8` profile adds `tools.jar`. `javac-internals-jdk9plus` passes the flags to
+the **test** JVM only — the tests invoke the processor by compiling in process, so they need the
+runtime access; compiling the library itself does not.
 
 ## The IDE plugin
 

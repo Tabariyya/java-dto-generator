@@ -10,6 +10,33 @@ import org.junit.jupiter.api.io.TempDir;
 /** What {@link FieldPath} accepts as a value, and what it refuses. */
 class FieldPathValidatorTest {
 
+    private static final String PACKAGE = "package demo;";
+    private static final String IMPORT_FIELDS = "import com.tabariyya.dtogenerator.fields.Fields;";
+    private static final String IMPORT_FIELD_PATH = "import com.tabariyya.dtogenerator.fields.FieldPath;";
+
+    private static final String USER = "demo.User";
+    private static final String ENGINEER = "demo.Engineer";
+    private static final String ACCOUNT = "demo.Account";
+
+    private static final JavaSource MARKER = JavaSource.of(
+            "demo.Marker", PACKAGE, IMPORT_FIELD_PATH,
+            "public @interface Marker {",
+            "    @FieldPath String[] anyField() default {};",
+            "    @FieldPath(User.class) String[] userField() default {};",
+            "    @FieldPath(returnType = true) String[] ownField() default {};",
+            "}");
+
+    private static final JavaSource USER_SOURCE = JavaSource.of(
+            USER, PACKAGE, IMPORT_FIELDS,
+            "@Fields public class User {", "    private String id;", "    private String password;", "}");
+
+    private static final JavaSource ENGINEER_SOURCE = JavaSource.of(
+            ENGINEER, PACKAGE, IMPORT_FIELDS,
+            "@Fields public class Engineer extends User {", "    private String emailAddress;", "}");
+
+    private static final JavaSource ACCOUNT_SOURCE = JavaSource.of(
+            ACCOUNT, PACKAGE, IMPORT_FIELDS, "@Fields public class Account {", "    private String date;", "}");
+
     @TempDir
     File classes;
 
@@ -20,12 +47,16 @@ class FieldPathValidatorTest {
 
     @Test
     void rejectsAStringThatIsNotAPath() {
-        assertFails(use("@Marker(anyField = {\"totally.made.up\"})"), FieldConstants.notAFieldMessage("totally.made.up"));
+        assertFails(
+                use("@Marker(anyField = {\"totally.made.up\"})"),
+                FieldConstants.notAFieldMessage("totally.made.up"));
     }
 
     @Test
     void rejectsAPathWhoseOwnerHasNoSuchField() {
-        assertFails(use("@Marker(anyField = {\"demo.User#missing\"})"), FieldConstants.notAFieldMessage("demo.User#missing"));
+        assertFails(
+                use("@Marker(anyField = {\"demo.User#missing\"})"),
+                FieldConstants.notAFieldMessage("demo.User#missing"));
     }
 
     @Test
@@ -37,57 +68,50 @@ class FieldPathValidatorTest {
     void rejectsAPathNamingAnotherClass() {
         assertFails(
                 use("@Marker(userField = {Account.DATE})"),
-                FieldConstants.wrongOwnerMessage("demo.Account#date", "demo.Account", "demo.User"));
+                FieldConstants.wrongOwnerMessage("demo.Account#date", ACCOUNT, USER));
     }
 
     @Test
     void rejectsASubclassPathWhereTheSuperclassIsExpected() {
         assertFails(
                 use("@Marker(userField = {Engineer.ID})"),
-                FieldConstants.wrongOwnerMessage("demo.Engineer#id", "demo.Engineer", "demo.User"));
+                FieldConstants.wrongOwnerMessage("demo.Engineer#id", ENGINEER, USER));
     }
 
     @Test
     void acceptsAPathNamingTheAnnotatedMethodsReturnType() {
-        assertCompiles(useOnMethod("User", "@Marker(ownField = {User.PASSWORD})"));
+        assertCompiles(useOnMethod("@Marker(ownField = {User.PASSWORD})"));
     }
 
     @Test
     void rejectsAPathNamingAnythingButTheAnnotatedMethodsReturnType() {
         assertFails(
-                useOnMethod("User", "@Marker(ownField = {Account.DATE})"),
-                FieldConstants.wrongOwnerMessage("demo.Account#date", "demo.Account", "demo.User"));
+                useOnMethod("@Marker(ownField = {Account.DATE})"),
+                FieldConstants.wrongOwnerMessage("demo.Account#date", ACCOUNT, USER));
     }
 
     @Test
     void theSameMemberFollowsWhicheverReturnTypeItIsUsedOn() {
-        assertCompiles(
-                Javac.source(
-                        "demo.Use",
-                        "package demo;",
-                        "public class Use {",
-                        "    @Marker(ownField = {User.PASSWORD}) User user() { return null; }",
-                        "    @Marker(ownField = {Account.DATE}) Account account() { return null; }",
-                        "}"));
+        assertCompiles(JavaSource.of(
+                "demo.Use", PACKAGE,
+                "public class Use {",
+                "    @Marker(ownField = {User.PASSWORD}) User user() { return null; }",
+                "    @Marker(ownField = {Account.DATE}) Account account() { return null; }",
+                "}"));
     }
 
     @Test
     void rejectsReturnTypeModeWhereThereIsNoReturnType() {
         assertFails(
-                Javac.source(
-                        "demo.Use",
-                        "package demo;",
-                        "@Marker(ownField = {User.PASSWORD})",
-                        "public class Use {}"),
+                JavaSource.of("demo.Use", PACKAGE, "@Marker(ownField = {User.PASSWORD})", "public class Use {}"),
                 FieldConstants.notOnAMethodMessage("ownField"));
     }
 
     @Test
     void rejectsReturnTypeModeOnAReturnTypeThatIsNotAClass() {
         assertFails(
-                Javac.source(
-                        "demo.Use",
-                        "package demo;",
+                JavaSource.of(
+                        "demo.Use", PACKAGE,
                         "public class Use {",
                         "    @Marker(ownField = {User.PASSWORD}) void nothing() {}",
                         "}"),
@@ -97,36 +121,26 @@ class FieldPathValidatorTest {
     @Test
     void rejectsAMemberThatIsNeitherStringNorStringArray() {
         assertFails(
-                Javac.source(
-                        "demo.Bad",
-                        "package demo;",
-                        "import com.tabariyya.dtogenerator.fields.FieldPath;",
-                        "public @interface Bad {",
-                        "    @FieldPath int count() default 0;",
-                        "}"),
+                JavaSource.of(
+                        "demo.Bad", PACKAGE, IMPORT_FIELD_PATH,
+                        "public @interface Bad {", "    @FieldPath int count() default 0;", "}"),
                 FieldConstants.unsupportedTypeMessage("int"));
     }
 
     @Test
     void rejectsUseOutsideAnAnnotationType() {
         assertFails(
-                Javac.source(
-                        "demo.Bad",
-                        "package demo;",
-                        "import com.tabariyya.dtogenerator.fields.FieldPath;",
-                        "public class Bad {",
-                        "    @FieldPath String path() { return null; }",
-                        "}"),
+                JavaSource.of(
+                        "demo.Bad", PACKAGE, IMPORT_FIELD_PATH,
+                        "public class Bad {", "    @FieldPath String path() { return null; }", "}"),
                 FieldConstants.notAnAnnotationMemberMessage());
     }
 
     @Test
     void rejectsNamingAnOwnerTwice() {
         assertFails(
-                Javac.source(
-                        "demo.Bad",
-                        "package demo;",
-                        "import com.tabariyya.dtogenerator.fields.FieldPath;",
+                JavaSource.of(
+                        "demo.Bad", PACKAGE, IMPORT_FIELD_PATH,
                         "public @interface Bad {",
                         "    @FieldPath(value = User.class, returnType = true) String[] both() default {};",
                         "}"),
@@ -138,27 +152,25 @@ class FieldPathValidatorTest {
         assertCompiles(use("@Marker(anyField = {User.ID, Account.DATE, Engineer.ID})"));
     }
 
-    private Javac.Source use(String annotation) {
-        return Javac.source("demo.Use", "package demo;", annotation, "public class Use {}");
+    private static JavaSource use(String annotation) {
+        return JavaSource.of("demo.Use", PACKAGE, annotation, "public class Use {}");
     }
 
-    private Javac.Source useOnMethod(String returnType, String annotation) {
-        return Javac.source(
-                "demo.Use",
-                "package demo;",
+    private static JavaSource useOnMethod(String annotation) {
+        return JavaSource.of(
+                "demo.Use", PACKAGE,
                 "public class Use {",
-                "    " + annotation + " " + returnType + " get() { return null; }",
+                "    " + annotation + " User get() { return null; }",
                 "}");
     }
 
-    private void assertCompiles(Javac.Source use) {
-        Javac.Result result = compile(use);
+    private void assertCompiles(JavaSource use) {
+        Compilation result = compile(use);
         assertTrue(result.succeeded(), result.toString());
     }
 
-    private void assertFails(Javac.Source use, String message) {
-        Javac.Result result = compile(use);
-        List<String> errors = result.errors();
+    private void assertFails(JavaSource use, String message) {
+        List<String> errors = compile(use).errors();
         for (String error : errors) {
             if (error.contains(message)) {
                 return;
@@ -167,50 +179,7 @@ class FieldPathValidatorTest {
         throw new AssertionError("expected an error containing:\n  " + message + "\nbut got:\n  " + errors);
     }
 
-    private Javac.Result compile(Javac.Source use) {
-        return Javac.compile(classes, marker(), user(), engineer(), account(), use);
-    }
-
-    private static Javac.Source marker() {
-        return Javac.source(
-                "demo.Marker",
-                "package demo;",
-                "import com.tabariyya.dtogenerator.fields.FieldPath;",
-                "public @interface Marker {",
-                "    @FieldPath String[] anyField() default {};",
-                "    @FieldPath(User.class) String[] userField() default {};",
-                "    @FieldPath(returnType = true) String[] ownField() default {};",
-                "}");
-    }
-
-    private static Javac.Source user() {
-        return Javac.source(
-                "demo.User",
-                "package demo;",
-                "import com.tabariyya.dtogenerator.fields.Fields;",
-                "@Fields public class User {",
-                "    private String id;",
-                "    private String password;",
-                "}");
-    }
-
-    private static Javac.Source engineer() {
-        return Javac.source(
-                "demo.Engineer",
-                "package demo;",
-                "import com.tabariyya.dtogenerator.fields.Fields;",
-                "@Fields public class Engineer extends User {",
-                "    private String emailAddress;",
-                "}");
-    }
-
-    private static Javac.Source account() {
-        return Javac.source(
-                "demo.Account",
-                "package demo;",
-                "import com.tabariyya.dtogenerator.fields.Fields;",
-                "@Fields public class Account {",
-                "    private String date;",
-                "}");
+    private Compilation compile(JavaSource use) {
+        return Javac.compile(classes, MARKER, USER_SOURCE, ENGINEER_SOURCE, ACCOUNT_SOURCE, use);
     }
 }

@@ -177,7 +177,8 @@ final class FieldPathValidator extends TreePathScanner<Void, Void> {
     private String problemWith(String path, String expectedOwner) {
         String owner = FieldConstants.ownerOf(path);
         TypeElement ownerType = owner.isEmpty() ? null : processingEnv.getElementUtils().getTypeElement(owner);
-        if (ownerType == null || !ElementFields.hasInstanceField(ownerType, FieldConstants.fieldNameOf(path))) {
+        if (ownerType == null
+                || !ElementFields.instanceNamesOf(ownerType).contains(FieldConstants.fieldNameOf(path))) {
             return FieldConstants.notAFieldMessage(path);
         }
         if (!expectedOwner.isEmpty() && !owner.equals(expectedOwner)) {
