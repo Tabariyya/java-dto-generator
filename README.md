@@ -131,10 +131,21 @@ variable).
 `@FieldPath` needs nothing. Its checks are written against supported compiler API
 (`com.sun.source`, `javax.lang.model`) and work on every JDK from 8 onwards.
 
-`@Fields` rewrites the syntax tree, which needs javac internals the JDK stopped exporting in 9.
+`@Fields` needs nothing either. It rewrites the syntax tree through javac internals that the module
+system closed in Java 9, so the processor opens them to itself at startup, exactly as Lombok does —
+add the dependency and it works.
 
-- **On Java 8**, nothing is needed.
-- **On Java 9 and later**, the compiler must be forked and given these **JVM arguments**:
+**On Java 24 and later that prints one warning**, because the only way in is `sun.misc.Unsafe`:
+
+```text
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by
+         com.tabariyya.dtogenerator.fields.JavacModules
+```
+
+To silence it, open the packages yourself and the processor will find them already open and do
+nothing. These are **JVM arguments, not compiler options** — the processor runs inside the compiler's
+own JVM, so only that JVM's module graph governs it, and javac rejects a plain `--add-exports`
+outright next to `target 8`:
 
 ```xml
 <plugin>
@@ -152,19 +163,9 @@ variable).
 </plugin>
 ```
 
-They are JVM arguments, not compiler options, and the difference is not cosmetic:
-
-- The processor **runs inside the compiler's own JVM**, so only that JVM's module graph decides what
-  it can reach. A compiler option governs the code being compiled — a different thing entirely, and
-  not the thing that is blocked here.
-- Compiling against the javac internals needs no flags at all: `target 8` turns module access
-  enforcement off for the compilation. Only *running* the processor is blocked.
-- Which is also why javac **rejects** a plain `--add-exports` alongside `target 8`:
-  `error: option --add-exports not allowed with target 8`.
-
-Without the flags, `@Fields` generates nothing and reports one warning naming them. It never fails
-the build — a project that uses only `@GenerateDto` or `@FieldPath` is unaffected by this library
-being on the classpath.
+If a future JDK closes the last route in, `@Fields` generates nothing and reports one warning naming
+these flags. It never fails the build — a project using only `@GenerateDto` or `@FieldPath` is
+unaffected by this library being on the classpath.
 
 ## Building
 
