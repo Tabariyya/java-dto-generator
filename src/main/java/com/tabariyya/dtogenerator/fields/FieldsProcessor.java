@@ -82,6 +82,7 @@ public class FieldsProcessor extends AbstractProcessor {
     }
 
     private void loadInjector(ProcessingEnvironment javac) {
+        JavacModules.openJavacTo(getClass());
         try {
             FieldsInjector loaded =
                     (FieldsInjector) Class.forName(INJECTOR).getDeclaredConstructor().newInstance();

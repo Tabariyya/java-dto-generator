@@ -29,10 +29,11 @@ import java.lang.annotation.Target;
  * already declares, or for a name two fields both want. Static fields are skipped silently. A local
  * class gets nothing and no warning, since annotation processing never reports one.
  *
- * <p><b>Needs compiler flags on Java 9 and later</b>, which {@link FieldPath} does not: injection
- * rewrites the syntax tree through javac internals. The compiler must be forked and given them as
- * {@code -J} JVM arguments — see the README. Without them this generates nothing and warns, naming
- * the flags.
+ * <p><b>Needs no build configuration.</b> Injection rewrites the syntax tree through javac internals,
+ * which the module system closes on Java 9 and later, so the processor opens them to itself at
+ * startup the way Lombok does. On Java 24 and later that costs a {@code sun.misc.Unsafe} deprecation
+ * warning naming {@code JavacModules}; passing the {@code --add-exports} flags from the README
+ * silences it, since the processor then finds the packages already open and does nothing.
  *
  * <p>Retention is {@code SOURCE}. The path's class part is canonical, so a nested class reads
  * {@code a.b.Outer.Inner#field}, which {@code Class.forName} does not accept. The IDE resolves these
