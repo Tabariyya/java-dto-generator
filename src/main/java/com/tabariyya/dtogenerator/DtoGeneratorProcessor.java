@@ -140,7 +140,7 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
                 continue;
             }
 
-            String existingFieldFqn = cleanTypeSignature(existingField.asType().toString());
+            String existingFieldFqn = cleanTypeSignature(fieldTypeIn(sourceType, existingField));
 
             List<AnnotationMirror> annotations =
                     new ArrayList<>();
@@ -187,6 +187,28 @@ public class DtoGeneratorProcessor extends AbstractProcessor {
         }
 
         writeRecord(method, newClassName, getExtendsTypeName(generateDto), fields);
+    }
+
+    /**
+     * The field's type as seen from the source class, not from wherever it was declared. A field
+     * inherited from a self-typed superclass such as {@code BaseModel<T>} declares {@code ID<T>};
+     * only substituting T from the concrete subtype gives the {@code ID<Saved>} a DTO can compile.
+     */
+    private String fieldTypeIn(TypeElement sourceType, VariableElement field) {
+        TypeMirror declaring = sourceType.asType();
+        if (declaring.getKind() != TypeKind.DECLARED) {
+            return field.asType().toString();
+        }
+        try {
+            return processingEnv
+                    .getTypeUtils()
+                    .asMemberOf((DeclaredType) declaring, field)
+                    .toString();
+        } catch (IllegalArgumentException notAMember) {
+            // asMemberOf rejects a field the type does not actually inherit; the declared type is
+            // still the best answer available.
+            return field.asType().toString();
+        }
     }
 
     /**
